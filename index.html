@@ -618,6 +618,93 @@
             box-shadow: 0 8px 25px rgba(15, 23, 42, 0.4);
         }
 
+        .send-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        /* Notification Styles */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            min-width: 300px;
+            max-width: 500px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        .notification-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .notification.success .notification-content {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .notification.error .notification-content {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .notification-icon {
+            font-size: 20px;
+        }
+
+        .notification-message {
+            flex: 1;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .notification-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s;
+        }
+
+        .notification-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
         /* Footer */
         .footer {
             background: #1e293b;
@@ -694,6 +781,12 @@
             .footer-content {
                 grid-template-columns: 1fr;
                 gap: 2rem;
+            }
+
+            .notification {
+                left: 20px;
+                right: 20px;
+                min-width: auto;
             }
         }
     </style>
@@ -854,8 +947,6 @@
                         </div>
                     </div>
                     
-
-                    
                     <div class="contact-item">
                         <div class="contact-icon address-icon">📍</div>
                         <div>
@@ -866,31 +957,31 @@
                 </div>
             </div>
             
-            <form class="contact-form">
+            <form class="contact-form" id="contactForm">
                 <div class="form-row">
                     <div class="form-group">
                         <label>First Name *</label>
-                        <input type="text" placeholder="" required>
+                        <input type="text" name="firstName" required>
                     </div>
                     <div class="form-group">
                         <label>Last Name *</label>
-                        <input type="text" placeholder="" required>
+                        <input type="text" name="lastName" required>
                     </div>
                 </div>
                 
                 <div class="form-group">
                     <label>Email *</label>
-                    <input type="email" placeholder="" required>
+                    <input type="email" name="email" required>
                 </div>
                 
                 <div class="form-group">
                     <label>Company</label>
-                    <input type="text" placeholder="Your Company">
+                    <input type="text" name="company" placeholder="Your Company">
                 </div>
                 
                 <div class="form-group">
                     <label>Message *</label>
-                    <textarea placeholder="Tell us about your security needs..." required></textarea>
+                    <textarea name="message" placeholder="Tell us about your security needs..." required></textarea>
                 </div>
                 
                 <button type="submit" class="send-btn">📧 Send Message</button>
@@ -933,6 +1024,119 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
     <script>
+        // ===== BACKEND INTEGRATION =====
+        // IMPORTANT: Update this URL after deploying to Render
+        // For local testing: 'http://localhost:3000'
+        // For production: 'https://securetag-backend.onrender.com'
+        const API_URL = 'http://localhost:3000'; // Change this to your Render URL after deployment
+
+        // Contact Form Integration
+        document.addEventListener('DOMContentLoaded', function() {
+            const contactForm = document.getElementById('contactForm');
+            
+            if (contactForm) {
+                contactForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    // Get form data
+                    const formData = {
+                        firstName: contactForm.firstName.value,
+                        lastName: contactForm.lastName.value,
+                        email: contactForm.email.value,
+                        company: contactForm.company.value,
+                        message: contactForm.message.value
+                    };
+
+                    // Get submit button and store original text
+                    const submitBtn = contactForm.querySelector('.send-btn');
+                    const originalBtnText = submitBtn.innerHTML;
+                    
+                    try {
+                        // Show loading state
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '⏳ Sending...';
+                        
+                        // Send data to backend
+                        const response = await fetch(`${API_URL}/api/contact`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(formData)
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok && data.success) {
+                            // Success
+                            showNotification('success', data.message);
+                            contactForm.reset(); // Clear form
+                            submitBtn.innerHTML = '✅ Sent Successfully!';
+                            
+                            // Reset button after 3 seconds
+                            setTimeout(() => {
+                                submitBtn.innerHTML = originalBtnText;
+                                submitBtn.disabled = false;
+                            }, 3000);
+                        } else {
+                            // Validation errors or other issues
+                            if (data.errors && Array.isArray(data.errors)) {
+                                showNotification('error', data.errors.join('<br>'));
+                            } else {
+                                showNotification('error', data.message || 'Failed to send message');
+                            }
+                            submitBtn.innerHTML = originalBtnText;
+                            submitBtn.disabled = false;
+                        }
+                    } catch (error) {
+                        // Network or other errors
+                        console.error('Error:', error);
+                        showNotification('error', 'Network error. Please check your connection and try again.');
+                        submitBtn.innerHTML = originalBtnText;
+                        submitBtn.disabled = false;
+                    }
+                });
+            }
+
+            // Function to show notifications
+            function showNotification(type, message) {
+                // Remove any existing notification
+                const existingNotification = document.querySelector('.notification');
+                if (existingNotification) {
+                    existingNotification.remove();
+                }
+
+                // Create notification element
+                const notification = document.createElement('div');
+                notification.className = `notification ${type}`;
+                notification.innerHTML = `
+                    <div class="notification-content">
+                        <span class="notification-icon">${type === 'success' ? '✅' : '❌'}</span>
+                        <span class="notification-message">${message}</span>
+                        <button class="notification-close">×</button>
+                    </div>
+                `;
+
+                // Add notification to page
+                document.body.appendChild(notification);
+
+                // Close button functionality
+                notification.querySelector('.notification-close').addEventListener('click', () => {
+                    notification.style.animation = 'slideOut 0.3s ease-out';
+                    setTimeout(() => notification.remove(), 300);
+                });
+
+                // Auto-remove after 5 seconds
+                setTimeout(() => {
+                    if (document.body.contains(notification)) {
+                        notification.style.animation = 'slideOut 0.3s ease-out';
+                        setTimeout(() => notification.remove(), 300);
+                    }
+                }, 5000);
+            }
+        });
+
+        // ===== EXISTING DEMO FUNCTIONALITY =====
         let stream = null;
         let scanning = false;
 
@@ -1054,29 +1258,24 @@
             });
         });
 
-        // Form submission
-        document.querySelector('.contact-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            alert('Thank you for your message! We\'ll get back to you soon.');
-        });
-
         // Try Demo button
         document.querySelector('.try-demo-btn').addEventListener('click', function() {
             document.querySelector('#demo').scrollIntoView({
                 behavior: 'smooth'
             });
         });
-		
-		// Get Started button scroll to first name input
-		document.querySelector('.get-started-btn').addEventListener('click', function() {
-			document.querySelector('input[type="text"]').scrollIntoView({
-				behavior: 'smooth',
-				block: 'center'
-			});
-			// Optional: Focus on the first name input
-			document.querySelector('input[type="text"]').focus();
-		});
-		
+        
+        // Get Started button scroll to first name input
+        document.querySelector('.get-started-btn').addEventListener('click', function() {
+            document.querySelector('#contact').scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+            // Focus on the first name input
+            setTimeout(() => {
+                document.querySelector('input[name="firstName"]').focus();
+            }, 500);
+        });
 
         // Simulate NFC tap
         document.querySelector('.simulate-btn').addEventListener('click', function() {
